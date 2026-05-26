@@ -202,6 +202,7 @@
         let activeTaskId = null;
         let isMerging = false;
         let draggedItemIndex = null;
+        let sessionCount = 0;
 
         const defaultSettings = { short: 25, long: 45, meeting: 60, shortBreak: 5, longBreak: 15 };
 
@@ -295,12 +296,30 @@
         }
 
         function handleTimeUp() {
-            clearInterval(timer); isRunning = false; startBtn.textContent = 'Start';
-            alert('Time is up!');
-            // Auto-log pomodoro to active task if working
-            if (activeTaskId && document.body.classList.contains('work-mode')) {
-                addPomodoroToTask(activeTaskId);
+            clearInterval(timer);
+            isRunning = false;
+            startBtn.textContent = 'Start';
+            
+            const isWorkMode = document.body.classList.contains('work-mode');
+        
+            if (isWorkMode) {
+                // Just finished a work session
+                if (activeTaskId) addPomodoroToTask(activeTaskId);
+                sessionCount++;
+                
+                // Decide break type
+                const breakType = (sessionCount % 4 === 0) ? 'longBreak' : 'shortBreak';
+                categorySelect.value = breakType;
+                alert('Work finished! Time for a ' + (sessionCount % 4 === 0 ? 'Long' : 'Short') + ' break.');
+            } else {
+                // Just finished a break
+                alert('Break over! Back to work.');
+                if (!activeTaskId && tasks.length > 0) {
+                setActiveTask(tasks[0].id);}
+                categorySelect.value = (activeTaskId) ? tasks.find(t => t.id === activeTaskId).categoryKey : 'short';
             }
+        
+            changeCategory(); // This sets the time but does NOT start the timer
         }
 
         function resetTimer() {
@@ -379,12 +398,26 @@
 
         function addPomodoroToTask(id) {
             const task = tasks.find(t => t.id === id);
-            if(task) { task.completed++; saveTasks(); renderTasks(); }
+            if (task) {
+                task.completed++;
+                saveTasks();
+        
+                // Check if goal is reached
+                if (task.completed >= task.estimated) {
+                    alert(`Great work! "${task.name}" is complete.`);
+                    // This will remove it from the list
+                    deleteTask(id); 
+                    // deleteTask triggers renderTasks(), which will 
+                    // automatically pick the next task because activeTaskId is now null
+                } else {
+                    renderTasks();
+                }
+            }
         }
 
         function deleteTask(id) {
-            if(activeTaskId === id) clearActiveTask();
             tasks = tasks.filter(t => t.id !== id);
+            if(activeTaskId === id) clearActiveTask();
             saveTasks(); renderTasks();
         }
 
@@ -482,6 +515,10 @@
         }
 
         function renderTasks() {
+            if (!activeTaskId && tasks.length > 0) {
+                setActiveTask(tasks[0].id);
+                return; // This triggers a re-render automatically
+            }
             taskList.innerHTML = '';
             tasks.forEach(task => {
                 const li = document.createElement('li');
