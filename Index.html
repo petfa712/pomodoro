@@ -424,11 +424,20 @@
         function updateTaskProperty(id, property, value) {
             const task = tasks.find(t => t.id === id);
             if (!task) return;
-    
-            task[property] = (property === 'estimated') ? parseInt(value) || 1 : value;
-    
+        
+            // 1. Update the data
+            task[property] = (property === 'estimated' || property === 'completed') ? parseInt(value) : value;
             saveTasks();
-            if (activeTaskId === id && property === 'categoryKey') changeCategory();
+        
+            // 2. Logic: If we edited the active task's category, update the timer
+            if (activeTaskId === id && property === 'categoryKey') {
+                const categorySelect = document.getElementById('categorySelect');
+                categorySelect.value = value; // Sync the dropdown
+                changeCategory();            // Refresh timer duration
+            }
+        
+            // 3. Refresh UI
+            renderTasks();
         }
 
         function onDragStart(index) { draggedItemIndex = index; }
@@ -438,6 +447,16 @@
             tasks.splice(targetIndex, 0, item);
             saveTasks();
             renderTasks();
+        }
+
+        function adjustEstimated(id, delta) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                // Ensure estimated doesn't go below 1
+                task.estimated = Math.max(1, (parseInt(task.estimated) || 1) + delta);
+                saveTasks();
+                renderTasks();
+            }
         }
 
         // --- MERGE LOGIC ---
@@ -545,16 +564,14 @@
                                     <option value="meeting" ${catKey === 'meeting' ? 'selected' : ''}>Meet</option>
                                 </select>
                             </span>
-                            <span class="task-stats">
-                                🍅 <input type="number" value="${task.completed}" onchange="updateTaskProperty(${task.id}, 'completed', this.value)" style="width: 30px;">
-                                / <input type="number" value="${task.estimated}" onchange="updateTaskProperty(${task.id}, 'estimated', this.value)" style="width: 30px;">
-                            </span>
+                            <span class="task-stats">🍅 ${task.completed} / ${task.estimated}</span>
                         </div>
                     </div>
                     <div class="task-actions">
                         ${task.id !== activeTaskId ? `<button class="action-btn" onclick="setActiveTask(${task.id})">▶ Work</button>` : ''}
                         ${isMerged ? `<button class="action-btn" style="background:#feca57; color:#2f3640;" onclick="unmergeTask(${task.id})">Unmerge</button>` : ''}
-                        <button onclick="addPomodoroToTask(${task.id})">+1</button>
+                        <button onclick="adjustEstimated(${task.id}, -1)">-1</button>
+                        <button onclick="adjustEstimated(${task.id}, 1)">+1</button>                        
                         <button class="delete-btn" onclick="deleteTask(${task.id})">X</button>
                     </div>
                 `;
