@@ -201,6 +201,7 @@
         let isRunning = false;
         let activeTaskId = null;
         let isMerging = false;
+        let draggedItemIndex = null;
 
         const defaultSettings = { short: 25, long: 45, meeting: 60, shortBreak: 5, longBreak: 15 };
 
@@ -387,6 +388,25 @@
             saveTasks(); renderTasks();
         }
 
+        function updateTaskProperty(id, property, value) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+    
+            task[property] = (property === 'estimated') ? parseInt(value) || 1 : value;
+    
+            saveTasks();
+            if (activeTaskId === id && property === 'categoryKey') changeCategory();
+        }
+
+        function onDragStart(index) { draggedItemIndex = index; }
+
+        function onDrop(targetIndex) {
+            const item = tasks.splice(draggedItemIndex, 1)[0];
+            tasks.splice(targetIndex, 0, item);
+            saveTasks();
+            renderTasks();
+        }
+
         // --- MERGE LOGIC ---
         function toggleMergeMode() {
             isMerging = !isMerging;
@@ -465,6 +485,10 @@
             taskList.innerHTML = '';
             tasks.forEach(task => {
                 const li = document.createElement('li');
+                li.setAttribute('draggable', 'true');
+                li.ondragstart = () => onDragStart(tasks.indexOf(task));
+                li.ondragover = (e) => e.preventDefault();
+                li.ondrop = () => onDrop(tasks.indexOf(task));
                 if (task.id === activeTaskId) li.classList.add('active-task-item');
                 
                 // Safety check for older cached tasks
@@ -477,10 +501,17 @@
                         <input type="checkbox" class="merge-checkbox merge-cb" value="${task.id}">
                         <div class="task-info">
                             <span class="task-title">
-                                ${task.name} 
-                                <span class="task-tag">${catLabel}</span>
+                                <input type="text" value="${task.name}" onchange="updateTaskProperty(${task.id}, 'name', this.value)" style="width: 100px;">
+                                <select onchange="updateTaskProperty(${task.id}, 'categoryKey', this.value)">
+                                    <option value="short" ${catKey === 'short' ? 'selected' : ''}>Short</option>
+                                    <option value="long" ${catKey === 'long' ? 'selected' : ''}>Long</option>
+                                    <option value="meeting" ${catKey === 'meeting' ? 'selected' : ''}>Meet</option>
+                                </select>
                             </span>
-                            <span class="task-stats">🍅 ${task.completed} / ${task.estimated}</span>
+                            <span class="task-stats">
+                                🍅 <input type="number" value="${task.completed}" onchange="updateTaskProperty(${task.id}, 'completed', this.value)" style="width: 30px;">
+                                / <input type="number" value="${task.estimated}" onchange="updateTaskProperty(${task.id}, 'estimated', this.value)" style="width: 30px;">
+                            </span>
                         </div>
                     </div>
                     <div class="task-actions">
