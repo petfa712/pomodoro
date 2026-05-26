@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flexi-Pomodoro Planner</title>
+    <style>
+        /* CSS Variables */
+        :root {
+            --bg: #f4f4f9;
+            --text: #333;
+            --primary: #ff6b6b; /* Work Red */
+            --break: #2ed573;   /* Break Green */
+            --secondary: #4ecdc4;
+            --dark: #2f3640;
+            --card-bg: #ffffff;
+            --item-bg: #ffffff;
+            --border: #dddddd;
+            --active-task: #fff3cd;
+        }
+
+        body.dark-mode {
+            --bg: #1a1b26;
+            --text: #a9b1d6;
+            --dark: #a9b1d6;
+            --card-bg: #24283b;
+            --item-bg: #1f2335;
+            --border: #414868;
+            --active-task: #3b4261;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            max-width: 650px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .header-actions { display: flex; gap: 1rem; }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 2rem;
+            transition: background-color 0.3s;
+        }
+
+        #activeTaskDisplay {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            min-height: 1.5rem;
+            color: var(--secondary);
+        }
+
+        .timer-display {
+            font-size: 5rem;
+            font-weight: bold;
+            margin: 0.5rem 0 1rem 0;
+            font-variant-numeric: tabular-nums;
+            transition: color 0.3s;
+        }
+        body.work-mode .timer-display { color: var(--primary); }
+        body.break-mode .timer-display { color: var(--break); }
+
+        .controls, .adjustments, .categories {
+            display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;
+        }
+
+        button, select, input {
+            padding: 0.5rem 1rem; font-size: 1rem; border: none; border-radius: 6px; cursor: pointer;
+            transition: opacity 0.2s, background-color 0.3s, color 0.3s;
+            color: var(--text); background-color: var(--item-bg); border: 2px solid var(--border);
+        }
+
+        button { background-color: var(--primary); color: white; border: none; font-weight: bold; }
+        button.secondary { background-color: var(--secondary); }
+        button.finish-btn { background-color: #feca57; color: #2f3640; }
+        button.action-btn { background-color: var(--dark); color: white; padding: 0.3rem 0.6rem; font-size: 0.85rem;}
+        button.icon-btn { background: none; color: var(--dark); font-size: 1.5rem; padding: 0; border: none; }
+        button:hover { opacity: 0.8; }
+        
+        #settingsPanel {
+            display: none; background: var(--card-bg); padding: 1.5rem; border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; border: 2px solid var(--secondary); text-align: left;
+        }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .setting-row input { width: 60px; text-align: center; }
+        .settings-actions { margin-top: 1rem; text-align: right; }
+
+        /* Task Section */
+        .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .task-input { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .task-input input[type="text"] { flex-grow: 1; min-width: 150px; }
+        .task-input input[type="number"] { width: 60px; }
+        
+        ul { list-style: none; padding: 0; margin: 0; }
+        li {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--item-bg); border: 2px solid transparent; padding: 1rem; margin-bottom: 0.5rem;
+            border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: border-color 0.2s, background-color 0.2s;
+        }
+        li.active-task-item { border-color: var(--primary); background-color: var(--active-task); }
+        
+        .task-left { display: flex; align-items: center; gap: 0.75rem; flex-grow: 1; text-align: left; }
+        .task-info { display: flex; flex-direction: column; }
+        .task-title { font-weight: bold; display: flex; align-items: center; gap: 0.5rem; }
+        .task-tag { font-size: 0.7rem; background: var(--secondary); color: white; padding: 2px 6px; border-radius: 4px; font-weight: normal; }
+        .task-stats { font-size: 0.85rem; opacity: 0.7; }
+        
+        .task-actions { display: flex; gap: 0.3rem; align-items: center; }
+        .task-actions button { padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+        .delete-btn { background-color: #ff4757; color: white; }
+
+        /* Merge UI */
+        .merge-checkbox { display: none; width: 1.2rem; height: 1.2rem; cursor: pointer; }
+        body.merging .merge-checkbox { display: block; }
+        body.merging .task-actions { display: none; } /* Hide normal actions while merging */
+        #mergeControls { display: none; gap: 0.5rem; margin-bottom: 1rem; justify-content: flex-end; }
+    </style>
+</head>
+<body class="work-mode">
+
+    <div class="header">
+        <h2>Flexi-Pomodoro</h2>
+        <div class="header-actions">
+            <button class="icon-btn" id="darkModeBtn" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
+            <button class="icon-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
+        </div>
+    </div>
+
+    <div id="settingsPanel">
+        <h3>Timer Settings (Minutes)</h3>
+        <div class="setting-row"><label>Short Pomodoro:</label><input type="number" id="setShort" min="1"></div>
+        <div class="setting-row"><label>Long Pomodoro:</label><input type="number" id="setLong" min="1"></div>
+        <div class="setting-row"><label>Meeting:</label><input type="number" id="setMeeting" min="1"></div>
+        <div class="setting-row"><label>Short Break:</label><input type="number" id="setShortBreak" min="1"></div>
+        <div class="setting-row"><label>Long Break:</label><input type="number" id="setLongBreak" min="1"></div>
+        <div class="settings-actions"><button onclick="saveSettings()">Save Configuration</button></div>
+    </div>
+
+    <div class="card">
+        <div id="activeTaskDisplay">Ready to focus!</div>
+        
+        <div class="categories">
+            <select id="categorySelect" onchange="changeCategory()"></select>
+        </div>
+
+        <div class="timer-display" id="timeDisplay">25:00</div>
+
+        <div class="adjustments">
+            <button class="secondary" onclick="adjustTime(-5)">-5 Min</button>
+            <button class="secondary" onclick="adjustTime(-1)">-1 Min</button>
+            <button class="secondary" onclick="adjustTime(1)">+1 Min</button>
+            <button class="secondary" onclick="adjustTime(5)">+5 Min</button>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" onclick="toggleTimer()">Start</button>
+            <button onclick="resetTimer()">Reset</button>
+            <button class="finish-btn" onclick="finishEarly()">Finish Early</button>
+        </div>
+    </div>
+
+    <div class="card" style="text-align: left;">
+        <div class="task-header">
+            <h3 style="margin: 0;">Your Tasks</h3>
+            <button class="action-btn" id="toggleMergeBtn" onclick="toggleMergeMode()">Merge Tasks</button>
+        </div>
+        
+        <div class="task-input">
+            <input type="text" id="taskName" placeholder="What are you working on?">
+            <select id="taskCategoryInput">
+                <option value="short">Short</option>
+                <option value="long">Long</option>
+                <option value="meeting">Meeting</option>
+            </select>
+            <input type="number" id="taskPomos" placeholder="Est" min="1" title="Estimated Pomodoros">
+            <button onclick="addTask()">Add</button>
+        </div>
+
+        <div id="mergeControls">
+            <button class="secondary" onclick="toggleMergeMode()">Cancel</button>
+            <button onclick="executeMerge()">Confirm Merge</button>
+        </div>
+
+        <ul id="taskList"></ul>
+    </div>
+
+    <script>
+        // --- APP STATE ---
+        let timer;
+        let timeLeft = 0;
+        let isRunning = false;
+        let activeTaskId = null;
+        let isMerging = false;
+
+        const defaultSettings = { short: 25, long: 45, meeting: 60, shortBreak: 5, longBreak: 15 };
+
+        let settings = JSON.parse(localStorage.getItem('pomodoroSettings')) || defaultSettings;
+        let tasks = JSON.parse(localStorage.getItem('pomodoroTasks')) || [];
+        let isDarkMode = localStorage.getItem('pomodoroDarkMode') === 'true';
+
+        // --- DOM ELEMENTS ---
+        const timeDisplay = document.getElementById('timeDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const categorySelect = document.getElementById('categorySelect');
+        const taskList = document.getElementById('taskList');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const darkModeBtn = document.getElementById('darkModeBtn');
+        const activeTaskDisplay = document.getElementById('activeTaskDisplay');
+
+        // --- INITIALIZATION ---
+        function init() {
+            applyTheme();
+            renderCategories();
+            renderTasks();
+            changeCategory(); 
+        }
+
+        // --- DARK MODE LOGIC ---
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            localStorage.setItem('pomodoroDarkMode', isDarkMode);
+            applyTheme();
+        }
+
+        function applyTheme() {
+            if (isDarkMode) { document.body.classList.add('dark-mode'); darkModeBtn.textContent = '☀️'; } 
+            else { document.body.classList.remove('dark-mode'); darkModeBtn.textContent = '🌙'; }
+        }
+
+        // --- SETTINGS LOGIC ---
+        function toggleSettings() {
+            if (settingsPanel.style.display === 'block') { settingsPanel.style.display = 'none'; } 
+            else {
+                document.getElementById('setShort').value = settings.short;
+                document.getElementById('setLong').value = settings.long;
+                document.getElementById('setMeeting').value = settings.meeting;
+                document.getElementById('setShortBreak').value = settings.shortBreak;
+                document.getElementById('setLongBreak').value = settings.longBreak;
+                settingsPanel.style.display = 'block';
+            }
+        }
+
+        function saveSettings() {
+            settings.short = parseInt(document.getElementById('setShort').value) || defaultSettings.short;
+            settings.long = parseInt(document.getElementById('setLong').value) || defaultSettings.long;
+            settings.meeting = parseInt(document.getElementById('setMeeting').value) || defaultSettings.meeting;
+            settings.shortBreak = parseInt(document.getElementById('setShortBreak').value) || defaultSettings.shortBreak;
+            settings.longBreak = parseInt(document.getElementById('setLongBreak').value) || defaultSettings.longBreak;
+            localStorage.setItem('pomodoroSettings', JSON.stringify(settings));
+            renderCategories(); changeCategory(); toggleSettings(); renderTasks();
+        }
+
+        function renderCategories() {
+            // Using Keys instead of hardcoded values makes it dynamic
+            categorySelect.innerHTML = `
+                <option value="short" data-type="work">Short Pomodoro (${settings.short}m)</option>
+                <option value="long" data-type="work">Long Pomodoro (${settings.long}m)</option>
+                <option value="meeting" data-type="work">Meeting (${settings.meeting}m)</option>
+                <option value="shortBreak" data-type="break">Short Break (${settings.shortBreak}m)</option>
+                <option value="longBreak" data-type="break">Long Break (${settings.longBreak}m)</option>
+            `;
+        }
+
+        // --- TIMER LOGIC ---
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            const modeIcon = document.body.classList.contains('work-mode') ? '🍅' : '☕';
+            document.title = `${modeIcon} ${timeDisplay.textContent} - Flexi-Pomodoro`;
+        }
+
+        function toggleTimer() {
+            if (isRunning) {
+                clearInterval(timer); startBtn.textContent = 'Start'; isRunning = false;
+            } else {
+                if (timeLeft <= 0) return;
+                timer = setInterval(() => {
+                    timeLeft--; updateDisplay();
+                    if (timeLeft <= 0) handleTimeUp();
+                }, 1000);
+                startBtn.textContent = 'Pause'; isRunning = true;
+            }
+        }
+
+        function handleTimeUp() {
+            clearInterval(timer); isRunning = false; startBtn.textContent = 'Start';
+            alert('Time is up!');
+            // Auto-log pomodoro to active task if working
+            if (activeTaskId && document.body.classList.contains('work-mode')) {
+                addPomodoroToTask(activeTaskId);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timer); isRunning = false; startBtn.textContent = 'Start'; changeCategory(); 
+        }
+
+        function finishEarly() {
+            if (timeLeft === 0) return; 
+            clearInterval(timer); isRunning = false; timeLeft = 0; updateDisplay(); startBtn.textContent = 'Start';
+            alert('Finished early! Great job.');
+            // Auto-log pomodoro
+            if (activeTaskId && document.body.classList.contains('work-mode')) {
+                addPomodoroToTask(activeTaskId);
+            }
+        }
+
+        function changeCategory() {
+            const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+            const key = selectedOption.value; // e.g., "short"
+            const mins = settings[key];       // pulls from settings object
+            const type = selectedOption.getAttribute('data-type');
+            
+            if (type === 'break') {
+                document.body.classList.remove('work-mode'); document.body.classList.add('break-mode');
+            } else {
+                document.body.classList.remove('break-mode'); document.body.classList.add('work-mode');
+            }
+
+            timeLeft = mins * 60; updateDisplay();
+            if(isRunning) { clearInterval(timer); isRunning = false; startBtn.textContent = 'Start'; } 
+        }
+
+        function adjustTime(minutes) {
+            timeLeft += minutes * 60; if (timeLeft < 0) timeLeft = 0; updateDisplay();
+        }
+
+        // --- TASK LOGIC ---
+        function saveTasks() { localStorage.setItem('pomodoroTasks', JSON.stringify(tasks)); }
+
+        function addTask() {
+            const name = document.getElementById('taskName').value.trim();
+            const estPomos = parseInt(document.getElementById('taskPomos').value) || 1;
+            const categoryKey = document.getElementById('taskCategoryInput').value;
+            if (name === '') return;
+
+            // Ensure backward compatibility and subTask structure
+            tasks.push({ 
+                id: Date.now(), name: name, estimated: estPomos, completed: 0, 
+                categoryKey: categoryKey, subTasks: [] 
+            });
+            
+            document.getElementById('taskName').value = '';
+            document.getElementById('taskPomos').value = '';
+            saveTasks(); renderTasks();
+        }
+
+        function setActiveTask(id) {
+            activeTaskId = id;
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                activeTaskDisplay.textContent = `Working on: ${task.name}`;
+                // Automatically switch timer category to match task
+                if(task.categoryKey) {
+                    categorySelect.value = task.categoryKey;
+                    changeCategory();
+                }
+            }
+            renderTasks(); // Re-render to show active styling
+        }
+
+        function clearActiveTask() {
+            activeTaskId = null;
+            activeTaskDisplay.textContent = "Ready to focus!";
+            renderTasks();
+        }
+
+        function addPomodoroToTask(id) {
+            const task = tasks.find(t => t.id === id);
+            if(task) { task.completed++; saveTasks(); renderTasks(); }
+        }
+
+        function deleteTask(id) {
+            if(activeTaskId === id) clearActiveTask();
+            tasks = tasks.filter(t => t.id !== id);
+            saveTasks(); renderTasks();
+        }
+
+        // --- MERGE LOGIC ---
+        function toggleMergeMode() {
+            isMerging = !isMerging;
+            document.body.classList.toggle('merging', isMerging);
+            document.getElementById('mergeControls').style.display = isMerging ? 'flex' : 'none';
+            document.getElementById('toggleMergeBtn').style.display = isMerging ? 'none' : 'block';
+            renderTasks();
+        }
+
+        function executeMerge() {
+            const checkboxes = document.querySelectorAll('.merge-cb:checked');
+            if (checkboxes.length < 2) {
+                alert("Please select at least 2 tasks to merge."); return;
+            }
+
+            let mergedEst = 0;
+            let mergedComp = 0;
+            let subTasks = [];
+            let firstCategory = "short"; // default fallback
+
+            checkboxes.forEach((cb, index) => {
+                const id = parseInt(cb.value);
+                const task = tasks.find(t => t.id === id);
+                if (task) {
+                    mergedEst += task.estimated;
+                    mergedComp += task.completed;
+                    subTasks.push(task);
+                    if (index === 0 && task.categoryKey) firstCategory = task.categoryKey;
+                }
+            });
+
+            // Create combined name visually
+            const newName = `Merged: ` + subTasks.map(t => t.name).join(' + ');
+
+            // Remove old tasks
+            const idsToRemove = subTasks.map(t => t.id);
+            tasks = tasks.filter(t => !idsToRemove.includes(t.id));
+            if(idsToRemove.includes(activeTaskId)) clearActiveTask();
+
+            // Push new merged task
+            tasks.unshift({
+                id: Date.now(),
+                name: newName,
+                estimated: mergedEst,
+                completed: mergedComp,
+                categoryKey: firstCategory,
+                subTasks: subTasks
+            });
+
+            saveTasks(); toggleMergeMode(); // turns off merge mode and renders
+        }
+
+        function unmergeTask(id) {
+            const taskIndex = tasks.findIndex(t => t.id === id);
+            if (taskIndex > -1) {
+                const taskToUnmerge = tasks[taskIndex];
+                if (taskToUnmerge.subTasks && taskToUnmerge.subTasks.length > 0) {
+                    // Remove the parent task
+                    tasks.splice(taskIndex, 1);
+                    if(activeTaskId === id) clearActiveTask();
+                    // Put the children back (they retain their original completed counts)
+                    tasks.push(...taskToUnmerge.subTasks);
+                    saveTasks(); renderTasks();
+                }
+            }
+        }
+
+        function getCategoryLabel(key) {
+            if(key === 'short') return 'Short';
+            if(key === 'long') return 'Long';
+            if(key === 'meeting') return 'Meet';
+            return 'Task';
+        }
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                if (task.id === activeTaskId) li.classList.add('active-task-item');
+                
+                // Safety check for older cached tasks
+                const catKey = task.categoryKey || "short";
+                const catLabel = getCategoryLabel(catKey);
+                const isMerged = task.subTasks && task.subTasks.length > 0;
+
+                li.innerHTML = `
+                    <div class="task-left">
+                        <input type="checkbox" class="merge-checkbox merge-cb" value="${task.id}">
+                        <div class="task-info">
+                            <span class="task-title">
+                                ${task.name} 
+                                <span class="task-tag">${catLabel}</span>
+                            </span>
+                            <span class="task-stats">🍅 ${task.completed} / ${task.estimated}</span>
+                        </div>
+                    </div>
+                    <div class="task-actions">
+                        ${task.id !== activeTaskId ? `<button class="action-btn" onclick="setActiveTask(${task.id})">▶ Work</button>` : ''}
+                        ${isMerged ? `<button class="action-btn" style="background:#feca57; color:#2f3640;" onclick="unmergeTask(${task.id})">Unmerge</button>` : ''}
+                        <button onclick="addPomodoroToTask(${task.id})">+1</button>
+                        <button class="delete-btn" onclick="deleteTask(${task.id})">X</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
