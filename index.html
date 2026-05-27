@@ -203,7 +203,9 @@
         let isMerging = false;
         let draggedItemIndex = null;
         let sessionCount = 0;
+        let audioCtx = null;
 
+        const alarmSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-melodical-flute-music-notification-2310.mp3');
         const defaultSettings = { short: 25, long: 45, meeting: 60, shortBreak: 5, longBreak: 15 };
 
         let settings = JSON.parse(localStorage.getItem('pomodoroSettings')) || defaultSettings;
@@ -283,6 +285,8 @@
         }
 
         function toggleTimer() {
+            initAudio();
+            
             if (isRunning) {
                 clearInterval(timer); startBtn.textContent = 'Start'; isRunning = false;
             } else {
@@ -299,26 +303,28 @@
             clearInterval(timer);
             isRunning = false;
             startBtn.textContent = 'Start';
-            
+
+            playSoftChime();            
             const isWorkMode = document.body.classList.contains('work-mode');
-        
+            
             if (isWorkMode) {
-                // Just finished a work session
                 if (activeTaskId) addPomodoroToTask(activeTaskId);
                 sessionCount++;
                 
-                // Decide break type
                 const breakType = (sessionCount % 4 === 0) ? 'longBreak' : 'shortBreak';
                 categorySelect.value = breakType;
-                alert('Work finished! Time for a ' + (sessionCount % 4 === 0 ? 'Long' : 'Short') + ' break.');
+                setTimeout(() => {
+                    alert('Work finished! Time for a ' + (sessionCount % 4 === 0 ? 'Long' : 'Short') + ' break.');
+                },300);
             } else {
-                // Just finished a break
-                alert('Break over! Back to work.');
+                setTimeout(() => {
+                    alert('Break over! Back to work.');
+                },300);
                 if (!activeTaskId && tasks.length > 0) {
                 setActiveTask(tasks[0].id);}
                 categorySelect.value = (activeTaskId) ? tasks.find(t => t.id === activeTaskId).categoryKey : 'short';
             }
-        
+    
             changeCategory(); // This sets the time but does NOT start the timer
         }
 
@@ -328,12 +334,10 @@
 
         function finishEarly() {
             if (timeLeft === 0) return; 
-            clearInterval(timer); isRunning = false; timeLeft = 0; updateDisplay(); startBtn.textContent = 'Start';
-            alert('Finished early! Great job.');
-            // Auto-log pomodoro
-            if (activeTaskId && document.body.classList.contains('work-mode')) {
-                addPomodoroToTask(activeTaskId);
-            }
+            timeLeft = 0;
+            updateDisplay();
+
+            handleTimeUp();
         }
 
         function changeCategory() {
@@ -354,6 +358,39 @@
 
         function adjustTime(minutes) {
             timeLeft += minutes * 60; if (timeLeft < 0) timeLeft = 0; updateDisplay();
+        }
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSoftChime() {         
+            // 2. Wake up the audio context if the browser put it to sleep
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+        
+            oscillator.type = 'sine'; 
+            // Play instantly at the current hardware time
+            oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        
+            // Gentle fade out
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime); 
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5); 
+        
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+        
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 1.5);
         }
 
         // --- TASK LOGIC ---
