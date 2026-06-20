@@ -282,6 +282,7 @@
             timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             const modeIcon = document.body.classList.contains('work-mode') ? '🍅' : '☕';
             document.title = `${modeIcon} ${timeDisplay.textContent} - Flexi-Pomodoro`;
+            if (typeof updateTaskTimesInDOM === 'function') updateTaskTimesInDOM();
         }
 
         function toggleTimer() {
@@ -496,6 +497,65 @@
             }
         }
 
+        function calculateFinishTimes() {
+            let currentTime = Date.now();
+            let simTimeLeft = timeLeft;
+            let simSessionCount = sessionCount;
+            let isWork = document.body.classList.contains('work-mode');
+            
+            let finishTimes = {};
+            
+            // If currently on a break, add that break time first
+            if (!isWork && simTimeLeft > 0) {
+                currentTime += simTimeLeft * 1000;
+            }
+
+            // Go through tasks in order to simulate the timeline
+            tasks.forEach((task) => {
+                let remaining = task.estimated - task.completed;
+                if (remaining <= 0) {
+                    finishTimes[task.id] = "Done";
+                    return;
+                }
+
+                for (let i = 0; i < remaining; i++) {
+                    // 1. Add Work Duration
+                    if (task.id === activeTaskId && i === 0 && isWork && simTimeLeft > 0) {
+                        // Use actual remaining timer for the currently active pomodoro
+                        currentTime += simTimeLeft * 1000;
+                    } else {
+                        // Use standard settings for future pomodoros
+                        let mins = settings[task.categoryKey || 'short'] || 25;
+                        currentTime += mins * 60 * 1000;
+                    }
+                    
+                    simSessionCount++;
+                    
+                    // 2. Mark the finish time of the task (before adding the trailing break)
+                    if (i === remaining - 1) {
+                        let d = new Date(currentTime);
+                        finishTimes[task.id] = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    }
+                    
+                    // 3. Add Break Duration
+                    let breakMins = (simSessionCount % 4 === 0) ? settings.longBreak : settings.shortBreak;
+                    currentTime += breakMins * 60 * 1000;
+                }
+            });
+            
+            return finishTimes;
+        }
+
+        function updateTaskTimesInDOM() {
+            const finishTimes = calculateFinishTimes();
+            for (const id in finishTimes) {
+                const timeSpan = document.getElementById(`finish-time-${id}`);
+                if (timeSpan) {
+                    timeSpan.textContent = finishTimes[id] === 'Done' ? '✅ Done' : `🏁 ${finishTimes[id]}`;
+                }
+            }
+        }
+
         // --- MERGE LOGIC ---
         function toggleMergeMode() {
             isMerging = !isMerging;
@@ -584,9 +644,7 @@
                 li.ondrop = () => onDrop(tasks.indexOf(task));
                 if (task.id === activeTaskId) li.classList.add('active-task-item');
                 
-                // Safety check for older cached tasks
                 const catKey = task.categoryKey || "short";
-                const catLabel = getCategoryLabel(catKey);
                 const isMerged = task.subTasks && task.subTasks.length > 0;
 
                 li.innerHTML = `
@@ -601,7 +659,10 @@
                                     <option value="meeting" ${catKey === 'meeting' ? 'selected' : ''}>Meet</option>
                                 </select>
                             </span>
-                            <span class="task-stats">🍅 ${task.completed} / ${task.estimated}</span>
+                            <span class="task-stats">
+                                🍅 ${task.completed} / ${task.estimated} 
+                                <span id="finish-time-${task.id}" style="margin-left:12px; color:var(--secondary); font-weight:bold;"></span>
+                            </span>
                         </div>
                     </div>
                     <div class="task-actions">
@@ -614,6 +675,9 @@
                 `;
                 taskList.appendChild(li);
             });
+            
+            // Calculate and display the times immediately after rendering
+            updateTaskTimesInDOM();
         }
 
         init();
