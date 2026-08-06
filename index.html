@@ -206,6 +206,7 @@
         // --- APP STATE ---
         let timer;
         let timeLeft = 0;
+        let endTime = null;
         let isRunning = false;
         let activeTaskId = null;
         let isMerging = false;
@@ -301,14 +302,28 @@
             initAudio();
             
             if (isRunning) {
-                clearInterval(timer); startBtn.textContent = 'Start'; isRunning = false;
+                clearInterval(timer); 
+                startBtn.textContent = 'Start'; 
+                isRunning = false;
+                endTime = null;
             } else {
                 if (timeLeft <= 0) return;
+                
+                endTime = Date.now() + (timeLeft * 1000);
+                
                 timer = setInterval(() => {
-                    timeLeft--; updateDisplay();
-                    if (timeLeft <= 0) handleTimeUp();
-                }, 1000);
-                startBtn.textContent = 'Pause'; isRunning = true;
+                    timeLeft = Math.round((endTime - Date.now()) / 1000);
+                    
+                    if (timeLeft <= 0) {
+                        timeLeft = 0;
+                        handleTimeUp();
+                    } else {
+                        updateDisplay();
+                    }
+                }, 500);
+                
+                startBtn.textContent = 'Pause'; 
+                isRunning = true;
             }
         }
 
@@ -338,7 +353,7 @@
                 categorySelect.value = (activeTaskId) ? tasks.find(t => t.id === activeTaskId).categoryKey : 'short';
             }
     
-            changeCategory(); // This sets the time but does NOT start the timer
+            changeCategory();
         }
 
         function resetTimer() {
@@ -370,7 +385,22 @@
         }
 
         function adjustTime(minutes) {
-            timeLeft += minutes * 60; if (timeLeft < 0) timeLeft = 0; updateDisplay();
+            const timeDelta = minutes * 60;
+            timeLeft += timeDelta; 
+            
+            if (timeLeft < 0) {
+                timeLeft = 0;
+            }
+            
+            if (isRunning && endTime) {
+                endTime += (timeDelta * 1000);
+                
+                if (endTime < Date.now()) {
+                    endTime = Date.now();
+                }
+            }
+            
+            updateDisplay();
         }
 
         function initAudio() {
