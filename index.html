@@ -131,6 +131,7 @@
     <div class="header">
         <h2>Flexi-Pomodoro</h2>
         <div class="header-actions">
+            <button class="icon-btn" onclick="togglePiP()" title="Pop Out Timer">📺</button>
             <button class="icon-btn" id="darkModeBtn" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
             <button class="icon-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
         </div>
@@ -774,6 +775,64 @@
                 renderHistory();
             }
         }
+
+        const pipCanvas = document.createElement('canvas');
+        pipCanvas.width = 400;
+        pipCanvas.height = 200;
+        const pipCtx = pipCanvas.getContext('2d');
+        
+        const pipVideo = document.createElement('video');
+        pipVideo.autoplay = true;
+        pipVideo.muted = true;
+        pipVideo.srcObject = pipCanvas.captureStream(2);
+        
+        async function togglePiP() {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else {
+                try {
+                    await pipVideo.play();
+                    await pipVideo.requestPictureInPicture();
+                    updatePiPCanvas();
+                } catch (error) {
+                    console.error("PiP failed:", error);
+                    alert("Floating window is not supported by your browser.");
+                }
+            }
+        }
+        
+        function updatePiPCanvas() {
+            const isDark = document.body.classList.contains('dark-mode');
+            const isWork = document.body.classList.contains('work-mode');
+        
+            // Draw Background
+            pipCtx.fillStyle = isDark ? '#24283b' : '#ffffff';
+            pipCtx.fillRect(0, 0, 400, 200);
+        
+            pipCtx.fillStyle = isWork ? '#ff6b6b' : '#2ed573';
+            pipCtx.font = 'bold 80px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            pipCtx.textAlign = 'center';
+            pipCtx.textBaseline = 'middle';
+            pipCtx.fillText(timeDisplay.textContent, 200, 80);
+        
+            let taskText = "Ready to focus!";
+            if (activeTaskId) {
+                const task = tasks.find(t => t.id === activeTaskId);
+                if (task) taskText = task.name;
+            }
+            
+            pipCtx.fillStyle = isDark ? '#a9b1d6' : '#333333';
+            pipCtx.font = '24px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            
+            if (taskText.length > 25) taskText = taskText.substring(0, 22) + '...';
+            pipCtx.fillText(taskText, 200, 160);
+        }
+        
+        setInterval(() => {
+            if (document.pictureInPictureElement === pipVideo) {
+                updatePiPCanvas();
+            }
+        }, 500);
         
         init();
     </script>
